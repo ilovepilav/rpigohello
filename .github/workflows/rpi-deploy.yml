@@ -1,0 +1,41 @@
+# .github/workflows/rpi-deploy.yml
+
+name: Publish to RPI with Docker
+
+on:
+  workflow_run:
+    workflows: ["Build and Test"]
+    types:
+      - completed
+
+jobs:
+  build-and-run:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    # Check if the container exists before stopping and removing it
+    - name: Check if container exists
+      run: |
+        CONTAINER_EXISTS=$(docker ps -a --format "{{.Names}}" | grep -w rpigohello)
+        if [ -n "$CONTAINER_EXISTS" ]; then
+          echo "Container rpigohello exists, stopping and removing..."
+          docker rm -f rpigohello
+        else
+          echo "Container rpigohello does not exist."
+        fi        
+
+    - name: Build the Docker image
+      run: docker build -t "rpigohello" .
+
+    - name: Run Docker Container
+      run: docker run -d --restart always --network tunnel --name rpigohello rpigohello 
+
+    - name: Remove more than 10 days old images 
+      run: docker image prune -f --filter "until=240h"
+
+    - name: Remove more than 10 days old containers 
+      run: docker container prune -f --filter "until=240h"
+
